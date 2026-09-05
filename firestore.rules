@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+    match /databases/{database}/documents {
+
+          match /businesses/{businessId}/customers/{customerId} {
+                  // Svako može da PROČITA i UPIŠE svoj sopstveni zapis preko klijentske app
+                  // (nema login-a — gost i osoblje dele isti javni pristup po dizajnu, kao
+                            // i kod konkurencije). Ako kasnije dodaš Firebase Auth za osoblje, ovde
+                  // se pooštri pravilo da samo autentifikovano osoblje sme da uvećava pečate.
+                  allow read, write: if true;
+                }
+
+          match /businesses/{businessId}/claimCodes/{code} {
+                  allow read, write: if true;
+                }
+        }
+  }
+
+/*
+  NAPOMENA O BEZBEDNOSTI (pre nego što pustiš u produkciju sa pravim novcem):
+  Gornja pravila su namerno otvorena da bi demo/MVP radio odmah bez
+  autentifikacije. Za produkciju je preporuka:
+    1) Dodati Firebase Anonymous Auth ili PIN login za scanner.html/dashboard.html
+       tako da samo osoblje/vlasnik mogu da menjaju stamps (write), a gost
+       (card.html) samo čita svoj zapis.
+    2) Ograničiti da se "stamps" polje uvećava najviše za +1 po pisanju
+       (Firestore rules mogu da porede request.resource.data i resource.data).
+*/
