@@ -1,0 +1,174 @@
+<meta charset="UTF-8">
+<title>Moja kartica</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#5B3A29">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="stylesheet" href="style.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script src="config.js"></script>
+  <script src="logo.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="app.js"></script>
+
+  <div class="wrap">
+    <div class="top-brand">
+      <div class="logo" id="logoBox">☕</div>
+      <div>
+        <div class="name" id="bizName">Lokal</div>
+        <div class="sub">digitalna kartica lojalnosti</div>
+    </div>
+  </div>
+
+  <div id="demoPill" style="margin-bottom:14px; display:none;">
+    <span class="status-pill demo">DEMO režim — podaci se čuvaju samo na ovom uređaju</span>
+    </div>
+
+    <!-- ---------- Forma za registraciju ---------- -->
+    <div class="card" id="signupCard">
+      <h1>Dobrodošli 👋</h1>
+      <p class="muted">Unesite ime i broj telefona da napravite svoju digitalnu karticu.</p>
+      <label>Ime</label>
+      <input type="text" id="nameInput" placeholder="npr. Sava">
+      <label>Broj telefona</label>
+      <input type="tel" id="phoneInput" placeholder="06X XXX XXXX">
+      <button onclick="doSignup()">Napravi karticu</button>
+      <p class="hint">Kartica ostaje sačuvana na ovom telefonu — dodajte je na početni ekran da vam uvek bude pri ruci.</p>
+  </div>
+
+  <!-- ---------- Kartica gosta ---------- -->
+    <div id="cardView" style="display:none;">
+
+      <div class="reward-banner" id="rewardBanner" style="display:none;">
+        🎉 Nagrada spremna: <span id="rewardText"></span>! Pokažite osoblju ovaj ekran.
+    </div>
+
+    <div class="card">
+      <h2 id="greeting">Zdravo!</h2>
+      <div class="stamp-grid" id="stampGrid"></div>
+        <div class="progress-text" id="progressText"></div>
+      </div>
+
+      <div class="card">
+        <h2>Vaš kod</h2>
+        <p class="muted">Pokažite ovo osoblju na kasi da vam doda pečat — radi sa kamerom ili čitačem barkoda, koji god lokal ima.</p>
+        <div class="code-box">
+          <div class="qr-wrap"><canvas id="qrCanvas"></canvas></div>
+          <div class="barcode-wrap"><svg id="barcodeSvg"></svg></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Imate kod sa računa?</h2>
+      <p class="muted">Ako vam je osoblje dalo kod umesto skeniranja, unesite ga ovde.</p>
+      <input type="text" id="claimCodeInput" inputmode="numeric" placeholder="6-cifreni kod" maxlength="6">
+        <button class="secondary" onclick="doClaimCode()">Iskoristi kod</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+  function applyBranding() {
+        $("bizName").textContent = REVERA_CONFIG.businessName;
+    document.documentElement.style.setProperty("--primary", REVERA_CONFIG.primaryColor);
+    document.documentElement.style.setProperty("--accent", REVERA_CONFIG.accentColor);
+    applyRevraLogo("logoBox");
+    if (!Revera.isFirebase) $("demoPill").style.display = "block";
+  }
+
+  function getMyId() {
+        const params = new URLSearchParams(location.search);
+    return params.get("id") || localStorage.getItem(`revera:${REVERA_CONFIG.businessId}:myId`);
+  }
+
+  function setMyId(id) {
+        localStorage.setItem(`revera:${REVERA_CONFIG.businessId}:myId`, id);
+    const url = new URL(location.href);
+    url.searchParams.set("id", id);
+    history.replaceState(null, "", url);
+}
+
+  async function doSignup() {
+    const name = $("nameInput").value.trim();
+    const phone = $("phoneInput").value.trim();
+    if (!phone) { alert("Unesite broj telefona."); return; }
+    const customer = await Revera.createCustomer({ name, phone });
+    setMyId(customer.id);
+    showCard(customer.id);
+  }
+
+  function renderCodes(id) {
+        QRCode.toCanvas($("qrCanvas"), id, { width: 190, margin: 1, color: { dark: "#2A211C" } });
+    JsBarcode($("barcodeSvg"), id, { format: "CODE128", height: 50, displayValue: true, fontSize: 12, margin: 6 });
+}
+
+  function renderCustomer(c) {
+        if (!c) return;
+    $("greeting").textContent = c.name ? `Zdravo, ${c.name}!` : "Zdravo!";
+    const req = REVERA_CONFIG.stampsRequired;
+    const grid = $("stampGrid");
+    grid.innerHTML = "";
+    for (let i = 0; i < req; i++) {
+      const el = document.createElement("div");
+      el.className = "stamp" + (i < c.stamps ? " filled" : "");
+      el.textContent = i < c.stamps ? "★" : "";
+      grid.appendChild(el);
+    }
+    const remaining = Math.max(0, req - c.stamps);
+    $("progressText").textContent = remaining === 0
+            ? "Nagrada je spremna!"
+            : `Još ${remaining} do besplatne nagrade`;
+    $("rewardBanner").style.display = c.stamps >= req ? "block" : "none";
+    $("rewardText").textContent = REVERA_CONFIG.rewardText;
+}
+
+  function showCard(id) {
+        $("signupCard").style.display = "none";
+    $("cardView").style.display = "block";
+    // Najbitniji deo (broj pečata) mora da proradi čak i ako biblioteka za
+    // QR/barkod iz nekog razloga ne uspe da se učita (spor internet kod gosta,
+    // ad-blocker i sl.) — zato je watchCustomer odvojen od renderCodes i ne
+    // sme da zavisi od njega.
+    Revera.watchCustomer(id, renderCustomer);
+    try {
+      renderCodes(id);
+    } catch (e) {
+      console.error("Kod (QR/barkod) nije mogao da se prikaže:", e);
+      document.querySelector(".code-box").innerHTML =
+                '<p class="muted">Kod trenutno nije uspeo da se učita. Osveži stranicu, ili koristi opciju "Imate kod sa računa?" ispod.</p>';
+    }
+  }
+
+  async function doClaimCode() {
+    const id = getMyId();
+    const code = $("claimCodeInput").value.trim();
+    if (!id || !code) return;
+    const res = await Revera.redeemClaimCode(id, code);
+    if (res.ok) {
+      $("claimCodeInput").value = "";
+      alert("Pečat dodat!");
+    } else {
+      const msgs = { used: "Ovaj kod je već iskorišćen.", expired: "Kod je istekao — tražite novi.", not_found: "Nepoznat kod." };
+      alert(msgs[res.reason] || "Kod nije validan.");
+    }
+  }
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+
+  applyBranding();
+  const existingId = getMyId();
+  if (existingId) {
+    Revera.getCustomer(existingId).then((c) => {
+            if (c) showCard(existingId); else { /* stari id ne postoji, prikaži formu */ }
+  });
+}
+</script>
