@@ -18,7 +18,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
      e.waitUntil(
             caches.keys()
-              .then((names) => Promise.all(names.filter((n) => n !== CACHE).map((n) => caches.delete(n))))
+              .then((names) => Promise.all(names.filter((n) => n.startsWith("revera-") && n !== CACHE).map((n) => caches.delete(n))))
               .then(() => self.clients.claim())
           );
 });
