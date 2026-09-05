@@ -1,0 +1,139 @@
+<meta charset="UTF-8">
+  <title>Pregled — vlasnik</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+
+  <script src="config.js"></script>
+  <script src="logo.js"></script>
+  <script src="auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="app.js"></script>
+
+  <div class="wrap wide" id="pageContent" style="display:none;">
+    <div class="top-brand-row">
+      <div class="top-brand">
+        <div class="logo" id="logoBox"></div>
+        <div>
+          <div class="name" id="bizName">Lokal</div>
+          <div class="sub">pregled gostiju i pečata</div>
+        </div>
+      </div>
+      <button class="logout-link" onclick="ReveraAuth.logout('owner')">Odjava</button>
+    </div>
+    <div id="demoPill" style="margin-bottom:14px; display:none;">
+      <span class="status-pill demo">DEMO režim — lokalna baza na ovom uređaju</span>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-box"><div class="num" id="statTotal">0</div><div class="lbl">gostiju ukupno</div></div>
+      <div class="stat-box"><div class="num" id="statStamps">0</div><div class="lbl">pečata dato</div></div>
+      <div class="stat-box"><div class="num" id="statRewards">0</div><div class="lbl">nagrada iskorišćeno</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Gosti u riziku (nisu se vratili 14+ dana)</h2>
+      <p class="muted">Pošaljite podsetnik jednim klikom — otvara se poruka na vašem telefonu, spremna za slanje.</p>
+      <div id="riskList"><p class="muted">Učitavanje…</p></div>
+      <button class="secondary" id="bulkCopyBtn" onclick="copyRiskyForBulk()" style="display:none;">📋 Kopiraj brojeve i poruku (za masovno slanje)</button>
+    </div>
+
+    <div class="card">
+      <h2>Svi gosti</h2>
+      <table>
+        <thead>
+          <tr><th>Ime</th><th>Telefon</th><th>Pečati</th><th>Poslednja poseta</th><th>Status</th></tr>
+        </thead>
+        <tbody id="customerTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const RISK_DAYS = 14;
+    let lastRiskyList = [];
+
+    function applyBranding() {
+      $("bizName").textContent = REVERA_CONFIG.businessName;
+      document.documentElement.style.setProperty("--primary", REVERA_CONFIG.primaryColor);
+      document.documentElement.style.setProperty("--accent", REVERA_CONFIG.accentColor);
+      applyRevraLogo("logoBox");
+      if (!Revera.isFirebase) $("demoPill").style.display = "block";
+}
+
+  function daysAgo(ts) {
+        return Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24));
+  }
+
+  function fmtDate(ts) {
+        const d = daysAgo(ts);
+        if (d === 0) return "danas";
+        if (d === 1) return "juče";
+        return `pre ${d} dana`;
+  }
+
+  function reminderMessage() {
+        return (REVERA_CONFIG.smsReminderTemplate || "Nedostajete nam!")
+                .replace("{biznis}", REVERA_CONFIG.businessName);
+  }
+
+  // Otvara nativnu SMS aplikaciju na telefonu vlasnika/osoblja sa već
+  // upisanim brojem i tekstom — ne treba nikakav SMS API ni trošak po poruci,
+  // radi odmah iz browsera na telefonu.
+  function sendSms(phone) {
+        const body = encodeURIComponent(reminderMessage());
+              window.location.href = `sms:${phone}?body=${body}`;
+  }
+
+  // Kopira spisak brojeva + tekst poruke u clipboard, za lokale koji žele
+  // da pošalju masovno preko WhatsApp grupe, viber liste ili spoljnog SMS alata.
+  async function copyRiskyForBulk() {
+        const numbers = lastRiskyList.map((c) => c.phone).filter(Boolean).join(", ");
+        const text = `Poruka:\n${reminderMessage()}\n\nBrojevi (${lastRiskyList.length}):\n${numbers}`;
+        try {
+                await navigator.clipboard.writeText(text);
+                alert("Kopirano u clipboard — nalepite u SMS/WhatsApp alat po izboru.");
+        } catch (e) {
+                prompt("Kopirajte ručno:", text);
+        }
+  }
+
+  function render(list) {
+        $("statTotal").textContent = list.length;
+        $("statStamps").textContent = list.reduce((s, c) => s + (c.stamps || 0), 0);
+        $("statRewards").textContent = list.reduce((s, c) => s + (c.rewardsRedeemed || 0), 0);
+
+        const risky = list.filter((c) => daysAgo(c.lastVisit) >= RISK_DAYS);
+        lastRiskyList = risky;
+        $("bulkCopyBtn").style.display = risky.length > 0 ? "block" : "none";
+
+        $("riskList").innerHTML = risky.length === 0
+                ? `<p class="muted">Trenutno nema gostiju koji duže ne dolaze — odlično.</p>`
+                : risky.map((c) => `
+                                      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #EFE7DB;">
+                                        <span>${c.name || "Gost"} (•••${(c.phone||"").slice(-4)}) <span class="status-pill risk">${fmtDate(c.lastVisit)}</span></span>
+                                        <button style="width:auto; margin:0; padding:8px 14px; font-size:13px;" onclick="sendSms('${c.phone}')">✉️ SMS</button>
+                                      </div>
+                                    `).join("");
+
+                                $("customerTable").innerHTML = list.map((c) => {
+                                        const risk = daysAgo(c.lastVisit) >= RISK_DAYS;
+                                        return `
+                                                  <tr>
+                                                    <td>${c.name || "—"}</td>
+                                                    <td>•••${(c.phone||"").slice(-4)}</td>
+                                                    <td>${c.stamps}/${REVERA_CONFIG.stampsRequired}</td>
+                                                    <td>${fmtDate(c.lastVisit)}</td>
+                                                    <td><span class="status-pill ${risk ? "risk" : "ok"}">${risk ? "u riziku" : "aktivan"}</span></td>
+                                                  </tr>
+                                                `;
+                                }).join("");
+                            }
+
+                              ReveraAuth.requireAuth("owner", () => {
+                                    $("pageContent").style.display = "block";
+                                    applyBranding();
+                                    Revera.watchAllCustomers(render);
+                              });
+                            </script>
