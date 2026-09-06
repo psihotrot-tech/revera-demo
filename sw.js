@@ -7,7 +7,9 @@
    uzrokovala da izmene (npr. lokalni QR/barkod fajlovi) ostanu
    "zaglavljene" na uredjajima koji su vec otvarali karticu. Fetch
    koristi cache:"no-cache" da zaobidje i obican HTTP kes browsera,
-   ne samo Cache Storage. */
+   ne samo Cache Storage. Presrece SAMO GET zahteve ka sopstvenom
+   sajtu — Firebase/Firestore streaming konekcije ka drugim sajtovima
+   se ne diraju (presretanje njih je lomilo Firestore konekciju). */
 
 const CACHE = "revera-v2";
 const ASSETS = ["card.html", "style.css", "config.js", "app.js"];
@@ -34,13 +36,17 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
-     e.respondWith(
-            fetch(e.request, { cache: "no-cache" })
-              .then((res) => {
-                         const copy = res.clone();
-                         caches.open(CACHE).then((c) => c.put(e.request, copy));
-                         return res;
-              })
-              .catch(() => caches.match(e.request))
-          );
+     if (e.request.method !== "GET" || new URL(e.request.url).origin !== self.location.origin) {
+            return;
+     }
+
+                        e.respondWith(
+                               fetch(e.request, { cache: "no-cache" })
+                                 .then((res) => {
+                                            const copy = res.clone();
+                                            caches.open(CACHE).then((c) => c.put(e.request, copy));
+                                            return res;
+                                 })
+                                 .catch(() => caches.match(e.request))
+                             );
 });
