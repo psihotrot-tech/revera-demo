@@ -11,8 +11,8 @@
    sajtu — Firebase/Firestore streaming konekcije ka drugim sajtovima
    se ne diraju (presretanje njih je lomilo Firestore konekciju). */
 
-const CACHE = "revera-v2";
-const ASSETS = ["card.html", "style.css", "config.js", "app.js"];
+const CACHE = "revera-v3";
+const ASSETS = ["card.html", "style.css", "config.js", "app.js", "qrcode.min.js", "jsbarcode.min.js"];
 
 self.addEventListener("install", (e) => {
      self.skipWaiting();
