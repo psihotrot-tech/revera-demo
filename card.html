@@ -109,8 +109,13 @@
     JsBarcode($("barcodeSvg"), id, { format: "CODE128", height: 50, displayValue: true, fontSize: 12, margin: 6 });
   }
 
+  let lastCustomer = null; // pamtimo poslednje podatke gosta da bismo mogli
+  // ponovo da iscrtamo karticu (npr. broj pečata, tekst nagrade) i kad se
+  // PROMENE PODEŠAVANJA, ne samo kad se promene podaci gosta.
+
   function renderCustomer(c) {
     if (!c) return;
+    lastCustomer = c;
     $("greeting").textContent = c.name ? `Zdravo, ${c.name}!` : "Zdravo!";
     const req = REVERA_CONFIG.stampsRequired;
     const grid = $("stampGrid");
@@ -168,6 +173,10 @@
   Revera.watchSettings((settings) => {
     Revera.applySettings(settings);
     applyBranding(); // ponovo, sa vrednostima koje je vlasnik sam podesio
+    // Ako je kartica gosta već prikazana, ponovo je iscrtaj — tako broj
+    // traženih pečata i tekst nagrade odmah odražavaju novo podešavanje,
+    // čak i ako gost baš tog trenutka ne dobija novi pečat.
+    if (lastCustomer) renderCustomer(lastCustomer);
   });
   const existingId = getMyId();
   if (existingId) {
