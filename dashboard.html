@@ -1,139 +1,262 @@
 <meta charset="UTF-8">
-  <title>Pregled — vlasnik</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="style.css">
+<title>Pregled — vlasnik</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css">
 
-  <script src="config.js"></script>
-  <script src="logo.js"></script>
-  <script src="auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="app.js"></script>
+<script src="config.js"></script>
+<script src="logo.js"></script>
+<script src="auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="app.js"></script>
 
-  <div class="wrap wide" id="pageContent" style="display:none;">
-    <div class="top-brand-row">
-      <div class="top-brand">
-        <div class="logo" id="logoBox"></div>
-        <div>
-          <div class="name" id="bizName">Lokal</div>
-          <div class="sub">pregled gostiju i pečata</div>
-        </div>
+<div class="wrap wide" id="pageContent" style="display:none;">
+  <div class="top-brand-row">
+    <div class="top-brand">
+      <div class="logo" id="logoBox"></div>
+      <div>
+        <div class="name" id="bizName">Lokal</div>
+        <div class="sub">pregled gostiju i pečata</div>
       </div>
-      <button class="logout-link" onclick="ReveraAuth.logout('owner')">Odjava</button>
     </div>
-    <div id="demoPill" style="margin-bottom:14px; display:none;">
-      <span class="status-pill demo">DEMO režim — lokalna baza na ovom uređaju</span>
-    </div>
-
-    <div class="stat-row">
-      <div class="stat-box"><div class="num" id="statTotal">0</div><div class="lbl">gostiju ukupno</div></div>
-      <div class="stat-box"><div class="num" id="statStamps">0</div><div class="lbl">pečata dato</div></div>
-      <div class="stat-box"><div class="num" id="statRewards">0</div><div class="lbl">nagrada iskorišćeno</div></div>
-    </div>
-
-    <div class="card">
-      <h2>Gosti u riziku (nisu se vratili 14+ dana)</h2>
-      <p class="muted">Pošaljite podsetnik jednim klikom — otvara se poruka na vašem telefonu, spremna za slanje.</p>
-      <div id="riskList"><p class="muted">Učitavanje…</p></div>
-      <button class="secondary" id="bulkCopyBtn" onclick="copyRiskyForBulk()" style="display:none;">📋 Kopiraj brojeve i poruku (za masovno slanje)</button>
-    </div>
-
-    <div class="card">
-      <h2>Svi gosti</h2>
-      <table>
-        <thead>
-          <tr><th>Ime</th><th>Telefon</th><th>Pečati</th><th>Poslednja poseta</th><th>Status</th></tr>
-        </thead>
-        <tbody id="customerTable"></tbody>
-      </table>
-    </div>
+    <button class="logout-link" onclick="ReveraAuth.logout('owner')">Odjava</button>
+  </div>
+  <div id="demoPill" style="margin-bottom:14px; display:none;">
+    <span class="status-pill demo">DEMO režim — lokalna baza na ovom uređaju</span>
   </div>
 
-  <script>
-    const $ = (id) => document.getElementById(id);
-    const RISK_DAYS = 14;
-    let lastRiskyList = [];
+  <div class="tabs">
+    <button id="tabOverviewBtn" class="active" onclick="setTab('overview')">Pregled</button>
+    <button id="tabSettingsBtn" onclick="setTab('settings')">⚙️ Podešavanja</button>
+  </div>
 
-    function applyBranding() {
-      $("bizName").textContent = REVERA_CONFIG.businessName;
-      document.documentElement.style.setProperty("--primary", REVERA_CONFIG.primaryColor);
-      document.documentElement.style.setProperty("--accent", REVERA_CONFIG.accentColor);
-      applyRevraLogo("logoBox");
-      if (!Revera.isFirebase) $("demoPill").style.display = "block";
-}
+  <div id="tabOverview">
+  <div class="stat-row">
+    <div class="stat-box"><div class="num" id="statTotal">0</div><div class="lbl">gostiju ukupno</div></div>
+    <div class="stat-box"><div class="num" id="statStamps">0</div><div class="lbl">pečata dato</div></div>
+    <div class="stat-box"><div class="num" id="statRewards">0</div><div class="lbl">nagrada iskorišćeno</div></div>
+  </div>
+
+  <div class="card">
+    <h2 id="riskHeading">Gosti u riziku (dugo se nisu vratili)</h2>
+    <p class="muted">Pošaljite podsetnik jednim klikom — otvara se poruka na vašem telefonu, spremna za slanje.</p>
+    <div id="riskList"><p class="muted">Učitavanje…</p></div>
+    <button class="secondary" id="bulkCopyBtn" onclick="copyRiskyForBulk()" style="display:none;">📋 Kopiraj brojeve i poruku (za masovno slanje)</button>
+  </div>
+
+  <div class="card">
+    <h2>Svi gosti</h2>
+    <table>
+      <thead>
+        <tr><th>Ime</th><th>Telefon</th><th>Pečati</th><th>Poslednja poseta</th><th>Status</th></tr>
+      </thead>
+      <tbody id="customerTable"></tbody>
+    </table>
+  </div>
+  </div>
+
+  <!-- ---------- TAB: Podešavanja (vlasnik menja sam, bez koda) ---------- -->
+  <div id="tabSettings" style="display:none;">
+    <div class="card">
+      <h2>Identitet i izgled</h2>
+      <label>Ime lokala</label>
+      <input type="text" id="setBusinessName">
+      <label>Boja brenda (primarna)</label>
+      <input type="color" id="setPrimaryColor" style="height:48px; padding:6px; cursor:pointer;">
+      <label>Boja brenda (akcenat)</label>
+      <input type="color" id="setAccentColor" style="height:48px; padding:6px; cursor:pointer;">
+      <p class="hint">Ovo menja boje dugmadi, progres pečata i logo mark na kartici gosta, skeneru i ovde — uživo, na svim uređajima.</p>
+    </div>
+
+    <div class="card">
+      <h2>Nagrada</h2>
+      <label>Broj pečata za nagradu</label>
+      <input type="number" id="setStampsRequired" min="1" max="50">
+      <label>Tekst nagrade (šta gost dobija)</label>
+      <input type="text" id="setRewardText" placeholder="npr. 1 gratis kafa po izboru">
+    </div>
+
+    <div class="card">
+      <h2>Pristup (PIN)</h2>
+      <label>PIN za osoblje</label>
+      <input type="text" inputmode="numeric" id="setStaffPin" maxlength="8">
+      <label>PIN za vlasnika</label>
+      <input type="text" inputmode="numeric" id="setOwnerPin" maxlength="8">
+      <label>Koliko sati PIN važi na uređaju pre ponovnog unosa</label>
+      <input type="number" id="setSessionHours" min="1" max="168">
+      <p class="hint">Promena PIN-a važi odmah — osoblje/vlasnik će ga uneti pri sledećem "Odjava" ili isteku sesije.</p>
+    </div>
+
+    <div class="card">
+      <h2>Anti-fraud</h2>
+      <label>Gosti "u riziku" posle koliko dana bez posete</label>
+      <input type="number" id="setRiskDays" min="1" max="90">
+      <label>Cooldown između dva skena istog gosta (sekunde)</label>
+      <input type="number" id="setRescanCooldown" min="1" max="600">
+      <label>Trajanje jednokratnog koda sa računa (sekunde)</label>
+      <input type="number" id="setClaimTtl" min="10" max="600">
+    </div>
+
+    <div class="card">
+      <h2>SMS podsetnik</h2>
+      <label>Tekst poruke (koristi {biznis} za ime lokala)</label>
+      <input type="text" id="setSmsTemplate">
+    </div>
+
+    <button onclick="saveSettings()">💾 Sačuvaj podešavanja</button>
+    <p class="hint" id="settingsSaved" style="display:none; color:var(--success); font-weight:600;">✓ Sačuvano — promene su već uživo na svim uređajima.</p>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let lastRiskyList = [];
+
+  function setTab(tab) {
+    ["Overview", "Settings"].forEach((t) => {
+      $("tab" + t).style.display = t.toLowerCase() === tab ? "block" : "none";
+      $("tab" + t + "Btn").classList.toggle("active", t.toLowerCase() === tab);
+    });
+    if (tab === "settings") renderSettingsForm();
+  }
+
+  function renderSettingsForm() {
+    const c = REVERA_CONFIG;
+    $("setBusinessName").value = c.businessName || "";
+    $("setPrimaryColor").value = c.primaryColor || "#5B3A29";
+    $("setAccentColor").value = c.accentColor || "#D9A441";
+    $("setStampsRequired").value = c.stampsRequired ?? 10;
+    $("setRewardText").value = c.rewardText || "";
+    $("setStaffPin").value = c.auth?.staffPin || "";
+    $("setOwnerPin").value = c.auth?.ownerPin || "";
+    $("setSessionHours").value = c.auth?.sessionHours ?? 12;
+    $("setRiskDays").value = c.riskDays ?? 14;
+    $("setRescanCooldown").value = c.rescanCooldownSeconds ?? 15;
+    $("setClaimTtl").value = c.claimCodeTtlSeconds ?? 120;
+    $("setSmsTemplate").value = c.smsReminderTemplate || "";
+    $("settingsSaved").style.display = "none";
+  }
+
+  async function saveSettings() {
+    const patch = {
+      businessName: $("setBusinessName").value.trim(),
+      primaryColor: $("setPrimaryColor").value,
+      accentColor: $("setAccentColor").value,
+      stampsRequired: Math.max(1, parseInt($("setStampsRequired").value, 10) || 10),
+      rewardText: $("setRewardText").value.trim(),
+      riskDays: Math.max(1, parseInt($("setRiskDays").value, 10) || 14),
+      rescanCooldownSeconds: Math.max(1, parseInt($("setRescanCooldown").value, 10) || 15),
+      claimCodeTtlSeconds: Math.max(10, parseInt($("setClaimTtl").value, 10) || 120),
+      smsReminderTemplate: $("setSmsTemplate").value.trim(),
+      auth: {
+        staffPin: $("setStaffPin").value.trim(),
+        ownerPin: $("setOwnerPin").value.trim(),
+        sessionHours: Math.max(1, parseInt($("setSessionHours").value, 10) || 12),
+      },
+    };
+    await Revera.updateSettings(patch);
+    $("settingsSaved").style.display = "block";
+  }
+
+  function applyBranding() {
+    $("bizName").textContent = REVERA_CONFIG.businessName;
+    document.documentElement.style.setProperty("--primary", REVERA_CONFIG.primaryColor);
+    document.documentElement.style.setProperty("--accent", REVERA_CONFIG.accentColor);
+    applyRevraLogo("logoBox");
+    if (!Revera.isFirebase) $("demoPill").style.display = "block";
+  }
 
   function daysAgo(ts) {
-        return Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24));
+    return Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24));
   }
 
   function fmtDate(ts) {
-        const d = daysAgo(ts);
-        if (d === 0) return "danas";
-        if (d === 1) return "juče";
-        return `pre ${d} dana`;
+    const d = daysAgo(ts);
+    if (d === 0) return "danas";
+    if (d === 1) return "juče";
+    return `pre ${d} dana`;
   }
 
   function reminderMessage() {
-        return (REVERA_CONFIG.smsReminderTemplate || "Nedostajete nam!")
-                .replace("{biznis}", REVERA_CONFIG.businessName);
+    return (REVERA_CONFIG.smsReminderTemplate || "Nedostajete nam!")
+      .replace("{biznis}", REVERA_CONFIG.businessName);
   }
 
   // Otvara nativnu SMS aplikaciju na telefonu vlasnika/osoblja sa već
   // upisanim brojem i tekstom — ne treba nikakav SMS API ni trošak po poruci,
   // radi odmah iz browsera na telefonu.
   function sendSms(phone) {
-        const body = encodeURIComponent(reminderMessage());
-              window.location.href = `sms:${phone}?body=${body}`;
+    const body = encodeURIComponent(reminderMessage());
+    window.location.href = `sms:${phone}?body=${body}`;
   }
 
   // Kopira spisak brojeva + tekst poruke u clipboard, za lokale koji žele
   // da pošalju masovno preko WhatsApp grupe, viber liste ili spoljnog SMS alata.
   async function copyRiskyForBulk() {
-        const numbers = lastRiskyList.map((c) => c.phone).filter(Boolean).join(", ");
-        const text = `Poruka:\n${reminderMessage()}\n\nBrojevi (${lastRiskyList.length}):\n${numbers}`;
-        try {
-                await navigator.clipboard.writeText(text);
-                alert("Kopirano u clipboard — nalepite u SMS/WhatsApp alat po izboru.");
-        } catch (e) {
-                prompt("Kopirajte ručno:", text);
-        }
+    const numbers = lastRiskyList.map((c) => c.phone).filter(Boolean).join(", ");
+    const text = `Poruka:\n${reminderMessage()}\n\nBrojevi (${lastRiskyList.length}):\n${numbers}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      alert("Kopirano u clipboard — nalepite u SMS/WhatsApp alat po izboru.");
+    } catch (e) {
+      prompt("Kopirajte ručno:", text);
+    }
   }
 
   function render(list) {
-        $("statTotal").textContent = list.length;
-        $("statStamps").textContent = list.reduce((s, c) => s + (c.stamps || 0), 0);
-        $("statRewards").textContent = list.reduce((s, c) => s + (c.rewardsRedeemed || 0), 0);
+    $("statTotal").textContent = list.length;
+    $("statStamps").textContent = list.reduce((s, c) => s + (c.stamps || 0), 0);
+    $("statRewards").textContent = list.reduce((s, c) => s + (c.rewardsRedeemed || 0), 0);
 
-        const risky = list.filter((c) => daysAgo(c.lastVisit) >= RISK_DAYS);
-        lastRiskyList = risky;
-        $("bulkCopyBtn").style.display = risky.length > 0 ? "block" : "none";
+    const riskDays = REVERA_CONFIG.riskDays ?? 14;
+    $("riskHeading").textContent = `Gosti u riziku (nisu se vratili ${riskDays}+ dana)`;
+    const risky = list.filter((c) => daysAgo(c.lastVisit) >= riskDays);
+    lastRiskyList = risky;
+    $("bulkCopyBtn").style.display = risky.length > 0 ? "block" : "none";
 
-        $("riskList").innerHTML = risky.length === 0
-                ? `<p class="muted">Trenutno nema gostiju koji duže ne dolaze — odlično.</p>`
-                : risky.map((c) => `
-                                      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #EFE7DB;">
-                                        <span>${c.name || "Gost"} (•••${(c.phone||"").slice(-4)}) <span class="status-pill risk">${fmtDate(c.lastVisit)}</span></span>
-                                        <button style="width:auto; margin:0; padding:8px 14px; font-size:13px;" onclick="sendSms('${c.phone}')">✉️ SMS</button>
-                                      </div>
-                                    `).join("");
+    $("riskList").innerHTML = risky.length === 0
+      ? `<p class="muted">Trenutno nema gostiju koji duže ne dolaze — odlično.</p>`
+      : risky.map((c) => `
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #EFE7DB;">
+            <span>${c.name || "Gost"} (•••${(c.phone||"").slice(-4)}) <span class="status-pill risk">${fmtDate(c.lastVisit)}</span></span>
+            <button style="width:auto; margin:0; padding:8px 14px; font-size:13px;" onclick="sendSms('${c.phone}')">✉️ SMS</button>
+          </div>
+        `).join("");
 
-                                $("customerTable").innerHTML = list.map((c) => {
-                                        const risk = daysAgo(c.lastVisit) >= RISK_DAYS;
-                                        return `
-                                                  <tr>
-                                                    <td>${c.name || "—"}</td>
-                                                    <td>•••${(c.phone||"").slice(-4)}</td>
-                                                    <td>${c.stamps}/${REVERA_CONFIG.stampsRequired}</td>
-                                                    <td>${fmtDate(c.lastVisit)}</td>
-                                                    <td><span class="status-pill ${risk ? "risk" : "ok"}">${risk ? "u riziku" : "aktivan"}</span></td>
-                                                  </tr>
-                                                `;
-                                }).join("");
-                            }
+    $("customerTable").innerHTML = list.map((c) => {
+      const risk = daysAgo(c.lastVisit) >= (REVERA_CONFIG.riskDays ?? 14);
+      return `
+        <tr>
+          <td>${c.name || "—"}</td>
+          <td>•••${(c.phone||"").slice(-4)}</td>
+          <td>${c.stamps}/${REVERA_CONFIG.stampsRequired}</td>
+          <td>${fmtDate(c.lastVisit)}</td>
+          <td><span class="status-pill ${risk ? "risk" : "ok"}">${risk ? "u riziku" : "aktivan"}</span></td>
+        </tr>
+      `;
+    }).join("");
+  }
 
-                              ReveraAuth.requireAuth("owner", () => {
-                                    $("pageContent").style.display = "block";
-                                    applyBranding();
-                                    Revera.watchAllCustomers(render);
-                              });
-                            </script>
+  // Čekamo PRVI settings snapshot pre PIN ekrana — tako promenjen PIN
+  // (koji je vlasnik sam podesio) odmah tačno radi, bez zastarelog
+  // PIN-a iz config.js koji bi se video da je requireAuth krenuo pre
+  // nego što su podešavanja stigla.
+  let authStarted = false;
+  Revera.watchSettings((settings) => {
+    Revera.applySettings(settings);
+    if (!authStarted) {
+      authStarted = true;
+      ReveraAuth.requireAuth("owner", () => {
+        $("pageContent").style.display = "block";
+        applyBranding();
+        renderSettingsForm();
+        Revera.watchAllCustomers(render);
+      });
+    } else {
+      // Podešavanja promenjena dok je dashboard već otvoren (npr. sa
+      // drugog uređaja) — osveži prikaz uživo.
+      applyBranding();
+      if ($("tabSettings").style.display !== "none") renderSettingsForm();
+    }
+  });
+</script>
