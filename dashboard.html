@@ -36,6 +36,11 @@
     <div class="stat-box"><div class="num" id="statStamps">0</div><div class="lbl">pečata dato</div></div>
     <div class="stat-box"><div class="num" id="statRewards">0</div><div class="lbl">nagrada iskorišćeno</div></div>
   </div>
+  <div class="stat-row">
+    <div class="stat-box"><div class="num" id="statActive7">0</div><div class="lbl">aktivnih u 7 dana</div></div>
+    <div class="stat-box"><div class="num" id="statNew30">0</div><div class="lbl">novih gostiju (30d)</div></div>
+    <div class="stat-box"><div class="num" id="statAvgStamps">0</div><div class="lbl">prosek pečata/gost</div></div>
+  </div>
 
   <div class="card">
     <h2 id="riskHeading">Gosti u riziku (dugo se nisu vratili)</h2>
@@ -329,6 +334,11 @@
     $("statTotal").textContent = list.length;
     $("statStamps").textContent = list.reduce((s, c) => s + (c.stamps || 0), 0);
     $("statRewards").textContent = list.reduce((s, c) => s + (c.rewardsRedeemed || 0), 0);
+    $("statActive7").textContent = list.filter((c) => daysAgo(c.lastVisit) < 7).length;
+    $("statNew30").textContent = list.filter((c) => daysAgo(c.createdAt || c.lastVisit) < 30).length;
+    $("statAvgStamps").textContent = list.length
+      ? (list.reduce((s, c) => s + (c.stamps || 0), 0) / list.length).toFixed(1)
+      : "0";
 
     const riskDays = REVERA_CONFIG.riskDays ?? 14;
     $("riskHeading").textContent = `Gosti u riziku (nisu se vratili ${riskDays}+ dana)`;
