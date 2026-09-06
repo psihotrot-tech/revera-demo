@@ -14,7 +14,13 @@ const REVERA_LOGO_SVG = `
 function applyRevraLogo(elementId) {
     const el = document.getElementById(elementId);
     if (!el) return;
-    if (REVERA_CONFIG.logoText) {
+    if (REVERA_CONFIG.logoImageUrl) {
+          // Sopstvena slika loga (upload kroz Podešavanja) ima prednost nad
+          // svim ostalim opcijama.
+          el.innerHTML = "";
+          el.style.background = `center/cover no-repeat url("${REVERA_CONFIG.logoImageUrl}")`;
+    } else if (REVERA_CONFIG.logoText) {
+          el.innerHTML = "";
           el.textContent = REVERA_CONFIG.logoText;
           el.style.background = REVERA_CONFIG.primaryColor;
     } else {
