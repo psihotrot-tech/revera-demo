@@ -14,7 +14,15 @@ const ASSETS = ["card.html", "style.css", "config.js", "app.js"];
 
 self.addEventListener("install", (e) => {
      self.skipWaiting();
-     e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
+     e.waitUntil(
+            caches.open(CACHE).then((c) =>
+                     Promise.all(
+                                ASSETS.map((url) =>
+                                             fetch(url, { cache: "no-cache" }).then((res) => c.put(url, res))
+                                                   )
+                              )
+                                        )
+          );
 });
 
 self.addEventListener("activate", (e) => {
