@@ -168,6 +168,7 @@ button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
     border-radius: 999px;
     font-size: 12px;
     font-weight: 700;
+    white-space: nowrap;
 }
 .status-pill.ok { background: #E1F5EC; color: var(--success); }
 .status-pill.risk { background: #FCE5E5; color: var(--danger); }
@@ -187,8 +188,13 @@ button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
 .scan-flash.persist { animation: none; }
 @keyframes fadeOut { 0% {opacity:1;} 70% {opacity:1;} 100% {opacity:0; visibility:hidden;} }
 
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); }
+/* Tabela gostiju je uvijena u .table-scroll — na uskim (mobilnim) ekranima
+   pet kolona ume da bude šire od kartice, pa bez ovoga poslednja kolona
+   (status "aktivan"/"u riziku") vizuelno izlazi van ivice kartice. Sad se
+   tabela horizontalno skroluje unutar kartice umesto da preliva sadržaj. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; min-width: 480px; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
 
 .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
