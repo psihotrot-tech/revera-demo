@@ -44,7 +44,8 @@
   <div id="cardView" style="display:none;">
 
     <div class="reward-banner" id="rewardBanner" style="display:none;">
-      🎉 Nagrada spremna: <span id="rewardText"></span>! Pokažite osoblju ovaj ekran.
+      <img id="rewardImage" alt="" style="display:none; width:72px; height:72px; object-fit:cover; border-radius:14px; margin-bottom:10px;">
+      <div>🎉 Nagrada spremna: <span id="rewardText"></span>! Pokažite osoblju ovaj ekran.</div>
     </div>
 
     <div class="card">
@@ -132,6 +133,13 @@
       : `Još ${remaining} do besplatne nagrade`;
     $("rewardBanner").style.display = c.stamps >= req ? "block" : "none";
     $("rewardText").textContent = REVERA_CONFIG.rewardText;
+    const rewardImg = $("rewardImage");
+    if (REVERA_CONFIG.rewardImageUrl) {
+      rewardImg.src = REVERA_CONFIG.rewardImageUrl;
+      rewardImg.style.display = "block";
+    } else {
+      rewardImg.style.display = "none";
+    }
   }
 
   function showCard(id) {
@@ -160,7 +168,7 @@
       $("claimCodeInput").value = "";
       alert("Pečat dodat!");
     } else {
-      const msgs = { used: "Ovaj kod je već iskorišćen.", expired: "Kod je istekao — tražite novi.", not_found: "Nepoznat kod." };
+      const msgs = { used: "Ovaj kod je već iskoriš�en.", expired: "Kod je istekao — tražite novi.", not_found: "Nepoznat kod." };
       alert(msgs[res.reason] || "Kod nije validan.");
     }
   }
