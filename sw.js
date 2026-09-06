@@ -5,7 +5,9 @@
    izmena u kodu odmah stize do gostiju cim su online; kes sluzi samo
    kao rezerva ako nema interneta. Stara cache-first verzija je
    uzrokovala da izmene (npr. lokalni QR/barkod fajlovi) ostanu
-   "zaglavljene" na uredjajima koji su vec otvarali karticu. */
+   "zaglavljene" na uredjajima koji su vec otvarali karticu. Fetch
+   koristi cache:"no-cache" da zaobidje i obican HTTP kes browsera,
+   ne samo Cache Storage. */
 
 const CACHE = "revera-v2";
 const ASSETS = ["card.html", "style.css", "config.js", "app.js"];
@@ -25,7 +27,7 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
      e.respondWith(
-            fetch(e.request)
+            fetch(e.request, { cache: "no-cache" })
               .then((res) => {
                          const copy = res.clone();
                          caches.open(CACHE).then((c) => c.put(e.request, copy));
