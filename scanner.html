@@ -95,12 +95,41 @@
     if (tab === "scan") $("wedgeInput").focus();
   }
 
-  function flash(ok, text) {
+  function flash(ok, text, persist) {
     const el = document.createElement("div");
-    el.className = "scan-flash" + (ok ? "" : " err");
+    el.className = "scan-flash" + (ok ? "" : " err") + (persist ? " persist" : "");
     el.innerHTML = text;
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 1450);
+    if (!persist) setTimeout(() => el.remove(), 1450);
+    return el;
+  }
+
+  // Kad je nagrada spremna, ekran OSTAJE (ne nestaje sam) dok osoblje ne
+  // potvrdi dugmetom da je nagrada zaista uručena gostu — tek tada se
+  // pečati anuliraju (Revera.redeemReward). Ovo sprečava da se pečati
+  // slučajno anuliraju samim skeniranjem, pre nego što je gost dobio nagradu.
+  function showRewardReady(c) {
+    const msg = `🎉 NAGRADA SPREMNA<br><span style="font-size:16px;font-weight:400">${c.name || "Gost"} — ${c.stamps}/${REVERA_CONFIG.stampsRequired}</span>`;
+    const el = flash(true, msg, true);
+
+    const useBtn = document.createElement("button");
+    useBtn.textContent = "✅ Iskoristi nagradu";
+    useBtn.style.cssText = "width:auto; margin:0; padding:14px 22px; font-size:16px; background:#fff; color:var(--primary); font-weight:700;";
+    useBtn.onclick = async () => {
+      useBtn.disabled = true;
+      useBtn.textContent = "…";
+      await Revera.redeemReward(c.id);
+      el.innerHTML = "✅ Nagrada iskoriš�ena<br><span style='font-size:16px;font-weight:400'>Pečati su vraćeni na početak</span>";
+      setTimeout(() => el.remove(), 1400);
+    };
+
+    const closeBtn = document.createElement("button");
+    closeBtn.textContent = "Zatvori (bez korišćenja)";
+    closeBtn.style.cssText = "width:auto; margin:0; padding:10px 18px; font-size:13px; background:transparent; color:#fff; border:1px solid rgba(255,255,255,.6); font-weight:400;";
+    closeBtn.onclick = () => el.remove();
+
+    el.appendChild(useBtn);
+    el.appendChild(closeBtn);
   }
 
   async function processCode(rawCode) {
@@ -116,10 +145,11 @@
       return;
     }
     const c = res.customer;
-    const msg = res.rewardReady
-      ? `🎉 NAGRADA SPREMNA<br><span style="font-size:16px;font-weight:400">${c.name || "Gost"} — ${c.stamps}/${REVERA_CONFIG.stampsRequired}</span>`
-      : `✅ Pečat dodat<br><span style="font-size:16px;font-weight:400">${c.name || "Gost"} — ${c.stamps}/${REVERA_CONFIG.stampsRequired}</span>`;
-    flash(true, msg);
+    if (res.rewardReady) {
+      showRewardReady(c);
+      return;
+    }
+    flash(true, `✅ Pečat dodat<br><span style="font-size:16px;font-weight:400">${c.name || "Gost"} — ${c.stamps}/${REVERA_CONFIG.stampsRequired}</span>`);
   }
 
   // ---------- Čitač barkoda (keyboard wedge) ----------
