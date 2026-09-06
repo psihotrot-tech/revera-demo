@@ -111,6 +111,9 @@
 <script>
   const $ = (id) => document.getElementById(id);
   let lastRiskyList = [];
+  let lastCustomerList = null; // pamtimo poslednju listu gostiju da bismo je
+  // ponovo iscrtali kad se promene PODEŠAVANJA (npr. broj pečata za nagradu),
+  // ne samo kad se promene podaci gostiju.
 
   function setTab(tab) {
     ["Overview", "Settings"].forEach((t) => {
@@ -204,6 +207,7 @@
   }
 
   function render(list) {
+    lastCustomerList = list;
     $("statTotal").textContent = list.length;
     $("statStamps").textContent = list.reduce((s, c) => s + (c.stamps || 0), 0);
     $("statRewards").textContent = list.reduce((s, c) => s + (c.rewardsRedeemed || 0), 0);
@@ -257,6 +261,7 @@
       // drugog uređaja) — osveži prikaz uživo.
       applyBranding();
       if ($("tabSettings").style.display !== "none") renderSettingsForm();
+      if (lastCustomerList) render(lastCustomerList);
     }
   });
 </script>
