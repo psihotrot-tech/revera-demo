@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="app.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="html5-qrcode.min.js"></script>
 
 <div class="wrap" id="pageContent" style="display:none;">
   <div class="top-brand-row">
@@ -132,7 +132,7 @@
     }
   });
   // Vraćamo fokus na polje čim korisnik klikne bilo gde drugde na tab-u,
-  // da čitač uvek radi bez ručnog klikanja u polje.
+  // da čitač uvek radi bez ručnog klikanja.
   document.addEventListener("click", (e) => {
     if ($("tabScan").style.display !== "none" && e.target.tagName !== "BUTTON") {
       wedge.focus();
