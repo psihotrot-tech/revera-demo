@@ -66,6 +66,18 @@
       <label>Boja brenda (akcenat)</label>
       <input type="color" id="setAccentColor" style="height:48px; padding:6px; cursor:pointer;">
       <p class="hint">Ovo menja boje dugmadi, progres pečata i logo mark na kartici gosta, skeneru i ovde — uživo, na svim uređajima.</p>
+
+      <label>Logo lokala (slika, opciono)</label>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+        <div style="width:56px; height:56px; border-radius:12px; background:#EFE7DB; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
+          <img id="logoImagePreview" alt="" style="display:none; width:100%; height:100%; object-fit:cover;">
+        </div>
+        <div style="flex:1;">
+          <input type="file" accept="image/*" id="logoImageInput" onchange="onLogoImageChosen(event)">
+          <button type="button" class="secondary" id="removeLogoImageBtn" onclick="removeLogoImage()" style="display:none; margin-top:8px; padding:8px 14px; font-size:13px; width:auto;">Ukloni sliku</button>
+        </div>
+      </div>
+      <p class="hint">Ako dodate sliku, ona zamenjuje podrazumevani logo mark svuda — na kartici gosta, skeneru i ovde.</p>
     </div>
 
     <div class="card">
@@ -74,6 +86,18 @@
       <input type="number" id="setStampsRequired" min="1" max="50">
       <label>Tekst nagrade (šta gost dobija)</label>
       <input type="text" id="setRewardText" placeholder="npr. 1 gratis kafa po izboru">
+
+      <label>Slika nagrade (opciono — npr. fotografija kafe, kroasana...)</label>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+        <div style="width:56px; height:56px; border-radius:12px; background:#EFE7DB; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
+          <img id="rewardImagePreview" alt="" style="display:none; width:100%; height:100%; object-fit:cover;">
+        </div>
+        <div style="flex:1;">
+          <input type="file" accept="image/*" id="rewardImageInput" onchange="onRewardImageChosen(event)">
+          <button type="button" class="secondary" id="removeRewardImageBtn" onclick="removeRewardImage()" style="display:none; margin-top:8px; padding:8px 14px; font-size:13px; width:auto;">Ukloni sliku</button>
+        </div>
+      </div>
+      <p class="hint">Slika se prikazuje gostu na kartici čim mu je nagrada spremna.</p>
     </div>
 
     <div class="card">
@@ -115,6 +139,90 @@
   // ponovo iscrtali kad se promene PODEŠAVANJA (npr. broj pečata za nagradu),
   // ne samo kad se promene podaci gostiju.
 
+  // ---------- Slika loga / slika nagrade ----------
+  // undefined = korisnik nije dirao polje (ne šalji izmenu), null = korisnik
+  // je kliknuo "Ukloni sliku" (pošalji brisanje), string (data URL) = nova
+  // slika koju treba sačuvati. Slike se čuvaju direktno u Firestore dokumentu
+  // podešavanja kao mali JPEG (resize na klijentu), bez potrebe za posebnim
+  // Firebase Storage podešavanjem.
+  let logoImagePending;
+  let rewardImagePending;
+
+  function readAndResizeImage(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Čitanje fajla nije uspelo."));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("Slika nije mogla da se učita."));
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function updateImagePreview(imgId, removeBtnId, url) {
+    const img = $(imgId);
+    if (url) {
+      img.src = url;
+      img.style.display = "block";
+      $(removeBtnId).style.display = "inline-block";
+    } else {
+      img.style.display = "none";
+      img.removeAttribute("src");
+      $(removeBtnId).style.display = "none";
+    }
+  }
+
+  async function onLogoImageChosen(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      logoImagePending = await readAndResizeImage(file, 240, 0.8);
+      updateImagePreview("logoImagePreview", "removeLogoImageBtn", logoImagePending);
+    } catch (err) {
+      alert("Slika nije mogla da se učita — probajte drugu sliku.");
+    }
+    e.target.value = "";
+  }
+
+  function removeLogoImage() {
+    logoImagePending = null;
+    updateImagePreview("logoImagePreview", "removeLogoImageBtn", null);
+  }
+
+  async function onRewardImageChosen(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      rewardImagePending = await readAndResizeImage(file, 240, 0.8);
+      updateImagePreview("rewardImagePreview", "removeRewardImageBtn", rewardImagePending);
+    } catch (err) {
+      alert("Slika nije mogla da se učita — probajte drugu sliku.");
+    }
+    e.target.value = "";
+  }
+
+  function removeRewardImage() {
+    rewardImagePending = null;
+    updateImagePreview("rewardImagePreview", "removeRewardImageBtn", null);
+  }
+
   function setTab(tab) {
     ["Overview", "Settings"].forEach((t) => {
       $("tab" + t).style.display = t.toLowerCase() === tab ? "block" : "none";
@@ -137,6 +245,10 @@
     $("setRescanCooldown").value = c.rescanCooldownSeconds ?? 15;
     $("setClaimTtl").value = c.claimCodeTtlSeconds ?? 120;
     $("setSmsTemplate").value = c.smsReminderTemplate || "";
+    logoImagePending = undefined;
+    rewardImagePending = undefined;
+    updateImagePreview("logoImagePreview", "removeLogoImageBtn", c.logoImageUrl || null);
+    updateImagePreview("rewardImagePreview", "removeRewardImageBtn", c.rewardImageUrl || null);
     $("settingsSaved").style.display = "none";
   }
 
@@ -157,7 +269,13 @@
         sessionHours: Math.max(1, parseInt($("setSessionHours").value, 10) || 12),
       },
     };
+    // undefined = korisnik nije dirao sliku u ovoj sesiji — ne šaljemo polje,
+    // da ne bismo slučajno obrisali već sačuvanu sliku.
+    if (logoImagePending !== undefined) patch.logoImageUrl = logoImagePending;
+    if (rewardImagePending !== undefined) patch.rewardImageUrl = rewardImagePending;
     await Revera.updateSettings(patch);
+    logoImagePending = undefined;
+    rewardImagePending = undefined;
     $("settingsSaved").style.display = "block";
   }
 
