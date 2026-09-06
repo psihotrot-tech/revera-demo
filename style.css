@@ -167,6 +167,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     padding: 20px;
 }
 .scan-flash.err { background: rgba(192,57,43,.94); }
+.scan-flash.persist { animation: none; }
 @keyframes fadeOut { 0% {opacity:1;} 70% {opacity:1;} 100% {opacity:0; visibility:hidden;} }
 
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
