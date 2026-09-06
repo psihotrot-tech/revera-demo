@@ -77,6 +77,12 @@
 <script>
   const $ = (id) => document.getElementById(id);
   let html5QrCode = null;
+  // Prati poslednju start/stop operaciju kamere. Bez ovoga, brzo gašenje
+  // (npr. prelazak na drugi tab) i odmah ponovno paljenje mogu da se
+  // "sudare" — browser još nije stigao da oslobodi kameru od prethodnog
+  // stop() poziva, pa novi start() tiho ne uspe i dugme "Uključi kameru"
+  // deluje kao da ne radi ništa.
+  let cameraBusy = Promise.resolve();
 
   function applyBranding() {
     $("bizName").textContent = REVERA_CONFIG.businessName;
@@ -170,31 +176,52 @@
   });
 
   // ---------- Kamera (QR) ----------
+  // startCamera/stopCamera se uvek nadovezuju na "cameraBusy" lanac, tako
+  // da se dva poziva (npr. stopCamera sa promene taba pa odmah startCamera
+  // klikom na dugme) nikad ne izvršavaju istovremeno — čeka se da se
+  // prethodna operacija zaista završi pre sledeće.
   function startCamera() {
-    html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: 220 },
-      (decodedText) => {
-        processCode(decodedText);
-      },
-      () => {}
-    ).then(() => {
-      $("startCamBtn").style.display = "none";
-      $("stopCamBtn").style.display = "block";
-    }).catch(() => {
-      flash(false, "❌ Kamera nije dostupna<br><span style='font-size:16px;font-weight:400'>Proverite dozvolu za kameru</span>");
+    cameraBusy = cameraBusy.then(async () => {
+      if (html5QrCode) return; // već upaljena
+      html5QrCode = new Html5Qrcode("reader");
+      try {
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: 220 },
+          (decodedText) => {
+            processCode(decodedText);
+          },
+          () => {}
+        );
+        $("startCamBtn").style.display = "none";
+        $("stopCamBtn").style.display = "block";
+      } catch (e) {
+        html5QrCode = null;
+        flash(false, "❌ Kamera nije dostupna<br><span style='font-size:16px;font-weight:400'>Proverite dozvolu za kameru</span>");
+      }
     });
+    return cameraBusy;
   }
 
   function stopCamera() {
-    if (html5QrCode) {
-      html5QrCode.stop().catch(() => {});
-      html5QrCode.clear();
+    cameraBusy = cameraBusy.then(async () => {
+      if (!html5QrCode) {
+        $("startCamBtn").style.display = "block";
+        $("stopCamBtn").style.display = "none";
+        return;
+      }
+      const instance = html5QrCode;
       html5QrCode = null;
-    }
-    $("startCamBtn").style.display = "block";
-    $("stopCamBtn").style.display = "none";
+      $("startCamBtn").style.display = "block";
+      $("stopCamBtn").style.display = "none";
+      try {
+        await instance.stop();
+      } catch (e) {}
+      try {
+        instance.clear();
+      } catch (e) {}
+    });
+    return cameraBusy;
   }
 
   // ---------- Jednokratni kod ----------
