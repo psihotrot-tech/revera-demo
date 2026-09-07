@@ -155,6 +155,13 @@
       showRewardReady(c);
       return;
     }
+    if (res.justCompleted) {
+      // Kartica je BAŠ OVIM skeniranjem popunjena — nagrada još nije
+      // preuzimljiva (to postaje moguće tek na sledećem, odvojenom
+      // skeniranju ovog gosta, kad god ono bilo).
+      flash(true, `🎉 Kartica popunjena!<br><span style="font-size:16px;font-weight:400">${c.name || "Gost"} — nagrada čeka sledeću posetu</span>`);
+      return;
+    }
     flash(true, `✅ Pečat dodat<br><span style="font-size:16px;font-weight:400">${c.name || "Gost"} — ${c.stamps}/${REVERA_CONFIG.stampsRequired}</span>`);
   }
 
