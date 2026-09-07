@@ -198,7 +198,21 @@ const Revera = (() => {
                   /**
       * Dodaje jedan pečat gostu. Koristi se i kad OSOBLJE skenira
       * gostov QR/barkod direktno.
-      * Vraća { ok, customer, alreadyScanned, rewardReady }
+      *
+      * Ako je kartica VEĆ bila puna PRE ovog skeniranja, ovo skeniranje ne
+      * dodaje novi pečat — tretira se kao odvojena, kasnija poseta u kojoj
+      * gost dolazi da PREUZME nagradu (isto kao kod fizičke punch kartice:
+      * kad se ona preda na kasi, taj čin ne dobija novi žig, menja se za
+      * poklon). Tako nagrada nikad ne može da se iskoristi u ISTOM skeniranju
+      * u kom je i zarađena — mora doći do bar jednog novog, odvojenog
+      * skeniranja, što u praksi znači nova poseta kasi (istog ili nekog
+      * drugog dana), a ne vezano za protok vremena.
+      *
+      * Vraća { ok, customer, alreadyScanned, rewardReady, justCompleted }
+      *   - rewardReady: true   -> kartica je zatečena već punom, gost je tu
+      *                           da preuzme nagradu (prikazati ekran za to)
+      *   - justCompleted: true -> ovaj pečat je BAŠ TAD popunio karticu,
+      *                           nagrada još nije preuzimljiva
       */
                   async function addStamp(customerId) {
                          if (wasRecentlyScanned(customerId)) {
@@ -212,20 +226,32 @@ const Revera = (() => {
                            const doc = await tx.get(ref);
                            if (!doc.exists) return null;
                            const data = doc.data();
-                           const stamps = data.stamps + 1;
+                           const alreadyFull = data.stamps >= cfg.stampsRequired;
+                           const stamps = alreadyFull ? data.stamps : data.stamps + 1;
                            tx.update(ref, { stamps, lastVisit: Date.now() });
-                           return { ...data, stamps };
+                           return { ...data, stamps, alreadyFull };
                 });
                 if (!result) return { ok: false, notFound: true };
-                return { ok: true, customer: result, rewardReady: result.stamps >= cfg.stampsRequired };
+                return {
+                  ok: true,
+                  customer: result,
+                  rewardReady: result.alreadyFull,
+                  justCompleted: !result.alreadyFull && result.stamps >= cfg.stampsRequired,
+                };
        } else {
                 const all = lsGetAll();
                 const c = all[customerId];
                 if (!c) return { ok: false, notFound: true };
-                c.stamps += 1;
+                const alreadyFull = c.stamps >= cfg.stampsRequired;
+                if (!alreadyFull) c.stamps += 1;
                 c.lastVisit = Date.now();
                 lsSaveAll(all);
-                return { ok: true, customer: c, rewardReady: c.stamps >= cfg.stampsRequired };
+                return {
+                  ok: true,
+                  customer: c,
+                  rewardReady: alreadyFull,
+                  justCompleted: !alreadyFull && c.stamps >= cfg.stampsRequired,
+                };
        }
                   }
 
