@@ -4,7 +4,7 @@
     --primary: #2563eb;
     --primary-dark: #1d4ed8;
     --accent: #7c3aed;
-    --accent2: #0d9488;
+    --accent2: #1a1a1a;
     --bg: #f8f9fb;
     --card-bg: #FFFFFF;
     --text: #0a0a0f;
@@ -17,7 +17,7 @@
     --shadow: 0 14px 32px rgba(10, 10, 15, 0.09);
     --shadow-sm: 0 4px 16px rgba(10, 10, 15, 0.05);
     --grad-primary: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-    --grad-accent: linear-gradient(135deg, var(--accent2) 0%, #14b8a6 0% 100%);
+    --grad-accent: linear-gradient(135deg, #1a1a1a 0%, #d4af37 100%);
 }
 
 * { box-sizing: border-box; }
