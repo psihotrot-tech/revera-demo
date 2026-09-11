@@ -213,6 +213,16 @@ const Revera = (() => {
       *                           da preuzme nagradu (prikazati ekran za to)
       *   - justCompleted: true -> ovaj pečat je BAŠ TAD popunio karticu,
       *                           nagrada još nije preuzimljiva
+      *
+      * ZAKLJUČAVANJE NAGRADE: u trenutku kad kartica BAŠ TAD bude popunjena
+      * (justCompleted), na gosta se snima trenutni tekst/slika nagrade
+      * (lockedRewardText / lockedRewardImageUrl). Bez toga bi gost, ako
+      * vlasnik u međuvremenu promeni nagradu (npr. sa kafe na kroasan) pre
+      * nego što gost stigne da je iskoristi, na kraju dobio ono što je TADA
+      * podešeno umesto onoga što mu je obećano kad je skupio poslednji
+      * pečat. Zaključana vrednost se čuva sve dok se nagrada ne iskoristi
+      * (redeemReward je briše), tako da card.html i scanner.html mogu
+      * uvek da prikažu tačno ono što je gost zaradio.
       */
                   async function addStamp(customerId) {
                          if (wasRecentlyScanned(customerId)) {
@@ -228,8 +238,14 @@ const Revera = (() => {
                            const data = doc.data();
                            const alreadyFull = data.stamps >= cfg.stampsRequired;
                            const stamps = alreadyFull ? data.stamps : data.stamps + 1;
-                           tx.update(ref, { stamps, lastVisit: Date.now() });
-                           return { ...data, stamps, alreadyFull };
+                           const justCompleted = !alreadyFull && stamps >= cfg.stampsRequired;
+                           const update = { stamps, lastVisit: Date.now() };
+                           if (justCompleted) {
+                                      update.lockedRewardText = cfg.rewardText;
+                                      update.lockedRewardImageUrl = cfg.rewardImageUrl || null;
+                           }
+                           tx.update(ref, update);
+                           return { ...data, ...update, alreadyFull };
                 });
                 if (!result) return { ok: false, notFound: true };
                 return {
@@ -245,12 +261,17 @@ const Revera = (() => {
                 const alreadyFull = c.stamps >= cfg.stampsRequired;
                 if (!alreadyFull) c.stamps += 1;
                 c.lastVisit = Date.now();
+                const justCompleted = !alreadyFull && c.stamps >= cfg.stampsRequired;
+                if (justCompleted) {
+                           c.lockedRewardText = cfg.rewardText;
+                           c.lockedRewardImageUrl = cfg.rewardImageUrl || null;
+                }
                 lsSaveAll(all);
                 return {
                   ok: true,
                   customer: c,
                   rewardReady: alreadyFull,
-                  justCompleted: !alreadyFull && c.stamps >= cfg.stampsRequired,
+                  justCompleted,
                 };
        }
                   }
@@ -270,6 +291,10 @@ const Revera = (() => {
                                              tx.update(ref, {
                                                           stamps: Math.max(0, data.stamps - cfg.stampsRequired),
                                                           rewardsRedeemed: (data.rewardsRedeemed || 0) + 1,
+                                                          // briše zaključanu nagradu — sledeći put kad kartica
+                                                          // bude popunjena, zaključaće se ono što je TADA aktuelno
+                                                          lockedRewardText: null,
+                                                          lockedRewardImageUrl: null,
                                              });
                                   });
                          } else {
@@ -278,6 +303,8 @@ const Revera = (() => {
                                   if (!c) return;
                                   c.stamps = Math.max(0, c.stamps - cfg.stampsRequired);
                                   c.rewardsRedeemed = (c.rewardsRedeemed || 0) + 1;
+                                  c.lockedRewardText = null;
+                                  c.lockedRewardImageUrl = null;
                                   lsSaveAll(all);
                          }
                   }
