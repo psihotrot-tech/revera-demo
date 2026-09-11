@@ -115,7 +115,11 @@
   // pečati anuliraju (Revera.redeemReward). Ovo sprečava da se pečati
   // slučajno anuliraju samim skeniranjem, pre nego što je gost dobio nagradu.
   function showRewardReady(c) {
-    const msg = `🎉 NAGRADA SPREMNA<br><span style="font-size:16px;font-weight:400">${c.name || "Gost"} — ${c.stamps}/${REVERA_CONFIG.stampsRequired}</span>`;
+    // Prikazujemo TAČNO onu nagradu koja je bila zaključana (c.lockedRewardText)
+    // u trenutku kad je ovom gostu kartica popunjena — ne trenutno podešavanje,
+    // koje je vlasnik u međuvremenu možda promenio.
+    const rewardText = c.lockedRewardText || REVERA_CONFIG.rewardText;
+    const msg = `🎉 NAGRADA SPREMNA<br><span style="font-size:16px;font-weight:400">${rewardText} — ${c.name || "Gost"}</span>`;
     const el = flash(true, msg, true);
 
     const useBtn = document.createElement("button");
@@ -158,8 +162,12 @@
     if (res.justCompleted) {
       // Kartica je BAŠ OVIM skeniranjem popunjena — nagrada još nije
       // preuzimljiva (to postaje moguće tek na sledećem, odvojenom
-      // skeniranju ovog gosta, kad god ono bilo).
-      flash(true, `🎉 Kartica popunjena!<br><span style="font-size:16px;font-weight:400">${c.name || "Gost"} — nagrada čeka sledeću posetu</span>`);
+      // skeniranju ovog gosta, kad god ono bilo). Nagrada koja se ovde
+      // pominje je upravo ona koja je BAŠ SAD zaključana za ovog gosta
+      // (c.lockedRewardText) — ista će mu biti prikazana i uručena kasnije,
+      // čak i ako se u međuvremenu promeni podešavanje nagrade.
+      const rewardText = c.lockedRewardText || REVERA_CONFIG.rewardText;
+      flash(true, `🎉 Kartica popunjena!<br><span style="font-size:16px;font-weight:400">${c.name || "Gost"} — nagrada (${rewardText}) čeka sledeću posetu</span>`);
       return;
     }
     flash(true, `✅ Pečat dodat<br><span style="font-size:16px;font-weight:400">${c.name || "Gost"} — ${c.stamps}/${REVERA_CONFIG.stampsRequired}</span>`);
