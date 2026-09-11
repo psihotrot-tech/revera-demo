@@ -108,6 +108,19 @@
     </div>
 
     <div class="card">
+      <h2>Vreme skeniranja pečata</h2>
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" id="setStampWindowEnabled" style="width:auto;">
+        Ograniči skeniranje pečata na deo dana
+      </label>
+      <label>Od</label>
+      <input type="time" id="setStampWindowStart">
+      <label>Do</label>
+      <input type="time" id="setStampWindowEnd">
+      <p class="hint">Kad je uključeno, osoblje van ovog perioda neće moći da doda pečat gostu — skener će prikazati poruku umesto toga. Period važi isto svaki dan, po vremenu uređaja kojim osoblje skenira.</p>
+    </div>
+
+    <div class="card">
       <h2>Pristup (PIN)</h2>
       <label>PIN za osoblje</label>
       <input type="text" inputmode="numeric" id="setStaffPin" maxlength="8">
@@ -245,6 +258,9 @@
     $("setAccentColor").value = c.accentColor || "#D9A441";
     $("setStampsRequired").value = c.stampsRequired ?? 10;
     $("setRewardText").value = c.rewardText || "";
+    $("setStampWindowEnabled").checked = !!c.stampWindowEnabled;
+    $("setStampWindowStart").value = c.stampWindowStart || "07:00";
+    $("setStampWindowEnd").value = c.stampWindowEnd || "13:00";
     $("setStaffPin").value = c.auth?.staffPin || "";
     $("setOwnerPin").value = c.auth?.ownerPin || "";
     $("setSessionHours").value = c.auth?.sessionHours ?? 12;
@@ -266,6 +282,9 @@
       accentColor: $("setAccentColor").value,
       stampsRequired: Math.max(1, parseInt($("setStampsRequired").value, 10) || 10),
       rewardText: $("setRewardText").value.trim(),
+      stampWindowEnabled: $("setStampWindowEnabled").checked,
+      stampWindowStart: $("setStampWindowStart").value || "07:00",
+      stampWindowEnd: $("setStampWindowEnd").value || "13:00",
       riskDays: Math.max(1, parseInt($("setRiskDays").value, 10) || 14),
       rescanCooldownSeconds: Math.max(1, parseInt($("setRescanCooldown").value, 10) || 15),
       claimCodeTtlSeconds: Math.max(10, parseInt($("setClaimTtl").value, 10) || 120),

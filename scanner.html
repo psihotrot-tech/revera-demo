@@ -146,6 +146,10 @@
     const code = (rawCode || "").trim();
     if (!code) return;
     const res = await Revera.addStamp(code);
+    if (res.outsideWindow) {
+      flash(false, `🕒 Skeniranje van radnog perioda<br><span style='font-size:16px;font-weight:400'>Moguće je samo od ${res.stampWindowStart} do ${res.stampWindowEnd}</span>`);
+      return;
+    }
     if (res.alreadyScanned) {
       flash(false, "⏱️ Već skenirano<br><span style='font-size:16px;font-weight:400'>Sačekajte par sekundi</span>");
       return;

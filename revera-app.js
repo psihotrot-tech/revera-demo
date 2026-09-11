@@ -1,0 +1,491 @@
+/* ============================================================
+   REVERA — data sloj
+   Radi u dva režima, automatski, bez ikakve promene u ostatku
+   koda:
+     1) DEMO režim  — čuva sve u localStorage (za testiranje na
+        jednom telefonu/računaru pre nego što napraviš Firebase).
+     2) PRODUKCIJA  — kad u config.js ubaciš firebase config,
+        automatski koristi Firestore u realnom vremenu, tako da
+        gostova kartica i staff skener vide iste podatke uživo.
+   ============================================================ */
+
+const Revera = (() => {
+     const cfg = REVERA_CONFIG;
+     const isFirebase = !!cfg.firebase;
+     let db = null;
+
+                  if (isFirebase && window.firebase) {
+                         firebase.initializeApp(cfg.firebase);
+                         db = firebase.firestore();
+                  }
+
+                  // ---------- Pomoćne funkcije ----------
+
+                  function genId(len = 10) {
+                         const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // bez lako-zabunjujućih znakova (0/O, 1/I)
+       let out = "";
+                         for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
+                         return out;
+                  }
+
+                  function genClaimCode() {
+                         return String(Math.floor(100000 + Math.random() * 900000)); // 6-cifreni kod
+                  }
+
+                  function lsKey(k) {
+                         return `revera:${cfg.businessId}:${k}`;
+                  }
+
+                  function lsGetAll() {
+                         try {
+                                  return JSON.parse(localStorage.getItem(lsKey("customers")) || "{}");
+                         } catch (e) {
+                                  return {};
+                         }
+                  }
+
+                  function lsSaveAll(data) {
+                         localStorage.setItem(lsKey("customers"), JSON.stringify(data));
+                         // window event da druge otvorene kartice/tabovi na istom uređaju vide promenu odmah (demo režim)
+       window.dispatchEvent(new CustomEvent("revera:update"));
+                  }
+
+                  function lsGetClaims() {
+                         try {
+                                  return JSON.parse(localStorage.getItem(lsKey("claims")) || "{}");
+                         } catch (e) {
+                                  return {};
+                         }
+                  }
+
+                  function lsSaveClaims(data) {
+                         localStorage.setItem(lsKey("claims"), JSON.stringify(data));
+                  }
+
+                  function lsGetRecentScans() {
+                         try {
+                                  return JSON.parse(localStorage.getItem(lsKey("recent_scans")) || "{}");
+                         } catch (e) {
+                                  return {};
+                         }
+                  }
+
+                  function lsSaveRecentScans(data) {
+                         localStorage.setItem(lsKey("recent_scans"), JSON.stringify(data));
+                  }
+
+                  function lsGetSettings() {
+                         try {
+                                  return JSON.parse(localStorage.getItem(lsKey("settings")) || "{}");
+                         } catch (e) {
+                                  return {};
+                         }
+                  }
+
+                  function lsSaveSettings(data) {
+                         localStorage.setItem(lsKey("settings"), JSON.stringify(data));
+                         window.dispatchEvent(new CustomEvent("revera:update"));
+                  }
+
+                  // ---------- Javni API ----------
+
+                  /**
+      * Registruje novog gosta. Vraća ceo objekat gosta (sa id-jem).
+      */
+                  async function createCustomer({ name, phone }) {
+                         const id = genId();
+                         const customer = {
+                                  id,
+                                  name: name || "",
+                                  phone: phone || "",
+                                  stamps: 0,
+                                  rewardsRedeemed: 0,
+                                  createdAt: Date.now(),
+                                  lastVisit: Date.now(),
+                         };
+
+       if (isFirebase) {
+                await db.collection("businesses").doc(cfg.businessId)
+                  .collection("customers").doc(id).set(customer);
+       } else {
+                const all = lsGetAll();
+                all[id] = customer;
+                lsSaveAll(all);
+       }
+                         return customer;
+                  }
+
+                  async function getCustomer(id) {
+                         if (isFirebase) {
+                                  const doc = await db.collection("businesses").doc(cfg.businessId)
+                                    .collection("customers").doc(id).get();
+                                  return doc.exists ? doc.data() : null;
+                         } else {
+                                  const all = lsGetAll();
+                                  return all[id] || null;
+                         }
+                  }
+
+                  /**
+      * Real-time listener na jednog gosta (koristi card.html da odmah
+      * prikaže novi pečat čim ga osoblje doda, bez refresh-a).
+      * callback(customerObj|null)
+      * Vraća unsubscribe funkciju.
+      */
+                  function watchCustomer(id, callback) {
+                         if (isFirebase) {
+                                  return db.collection("businesses").doc(cfg.businessId)
+                                    .collection("customers").doc(id)
+                                    .onSnapshot((doc) => callback(doc.exists ? doc.data() : null));
+                         } else {
+                                  const check = () => callback(lsGetAll()[id] || null);
+                                  check();
+                                  const handler = () => check();
+                                  window.addEventListener("revera:update", handler);
+                                  window.addEventListener("storage", handler);
+                                  return () => {
+                                             window.removeEventListener("revera:update", handler);
+                                             window.removeEventListener("storage", handler);
+                                  };
+                         }
+                  }
+
+                  /**
+      * Real-time listener na SVE goste (koristi dashboard.html).
+      */
+                  function watchAllCustomers(callback) {
+                         if (isFirebase) {
+                                  return db.collection("businesses").doc(cfg.businessId)
+                                    .collection("customers").orderBy("lastVisit", "desc")
+                                    .onSnapshot((snap) => {
+                                                 const list = [];
+                                                 snap.forEach((d) => list.push(d.data()));
+                                                 callback(list);
+                                    });
+                         } else {
+                                  const check = () => {
+                                             const all = lsGetAll();
+                                             const list = Object.values(all).sort((a, b) => b.lastVisit - a.lastVisit);
+                                             callback(list);
+                                  };
+                                  check();
+                                  const handler = () => check();
+                                  window.addEventListener("revera:update", handler);
+                                  window.addEventListener("storage", handler);
+                                  return () => {
+                                             window.removeEventListener("revera:update", handler);
+                                             window.removeEventListener("storage", handler);
+                                  };
+                         }
+                  }
+
+                  /**
+      * Glavna anti-fraud provera: da li je ovaj tačan kod (QR/barkod
+      * sadržaj gosta) već iskorišćen u poslednjih N sekundi. Sprečava
+      * da se slučajnim duplim skenom ili screenshot deljenjem istog
+      * ekrana u kratkom razmaku doda pečat dva puta.
+      */
+                  function wasRecentlyScanned(customerId) {
+                         const recent = lsGetRecentScans(); // čuvamo lokalno na uređaju skenera, namerno (po kasi, ne globalno)
+       const last = recent[customerId];
+                         const now = Date.now();
+                         if (last && now - last < cfg.rescanCooldownSeconds * 1000) return true;
+                         recent[customerId] = now;
+                         lsSaveRecentScans(recent);
+                         return false;
+                  }
+
+                  /**
+      * Da li je TRENUTNO vreme (na uređaju kojim osoblje skenira) unutar
+      * dozvoljenog perioda za dodavanje pečata (cfg.stampWindowStart —
+      * cfg.stampWindowEnd). Ako opcija nije uključena (stampWindowEnabled),
+      * nema ograničenja. Period važi isto svaki dan; ako je "do" manje od
+      * "od" (npr. 22:00–02:00), tretira se kao period koji prelazi preko
+      * ponoći.
+      */
+                  function isWithinStampWindow() {
+                         if (!cfg.stampWindowEnabled) return true;
+                         const toMinutes = (hhmm) => {
+                                  const [h, m] = String(hhmm || "0:0").split(":").map(Number);
+                                  return (h || 0) * 60 + (m || 0);
+                         };
+                         const start = toMinutes(cfg.stampWindowStart || "00:00");
+                         const end = toMinutes(cfg.stampWindowEnd || "23:59");
+                         const now = new Date();
+                         const nowMinutes = now.getHours() * 60 + now.getMinutes();
+                         if (start <= end) {
+                                  return nowMinutes >= start && nowMinutes <= end;
+                         }
+                         return nowMinutes >= start || nowMinutes <= end; // period preko ponoći
+                  }
+
+                  /**
+      * Dodaje jedan pečat gostu. Koristi se i kad OSOBLJE skenira
+      * gostov QR/barkod direktno.
+      *
+      * Ako je kartica VEĆ bila puna PRE ovog skeniranja, ovo skeniranje ne
+      * dodaje novi pečat — tretira se kao odvojena, kasnija poseta u kojoj
+      * gost dolazi da PREUZME nagradu (isto kao kod fizičke punch kartice:
+      * kad se ona preda na kasi, taj čin ne dobija novi žig, menja se za
+      * poklon). Tako nagrada nikad ne može da se iskoristi u ISTOM skeniranju
+      * u kom je i zarađena — mora doći do bar jednog novog, odvojenog
+      * skeniranja, što u praksi znači nova poseta kasi (istog ili nekog
+      * drugog dana), a ne vezano za protok vremena.
+      *
+      * Vraća { ok, customer, alreadyScanned, rewardReady, justCompleted }
+      *   - rewardReady: true   -> kartica je zatečena već punom, gost je tu
+      *                           da preuzme nagradu (prikazati ekran za to)
+      *   - justCompleted: true -> ovaj pečat je BAŠ TAD popunio karticu,
+      *                           nagrada još nije preuzimljiva
+      *
+      * ZAKLJUČAVANJE NAGRADE: u trenutku kad kartica BAŠ TAD bude popunjena
+      * (justCompleted), na gosta se snima trenutni tekst/slika nagrade
+      * (lockedRewardText / lockedRewardImageUrl). Bez toga bi gost, ako
+      * vlasnik u međuvremenu promeni nagradu (npr. sa kafe na kroasan) pre
+      * nego što gost stigne da je iskoristi, na kraju dobio ono što je TADA
+      * podešeno umesto onoga što mu je obećano kad je skupio poslednji
+      * pečat. Zaključana vrednost se čuva sve dok se nagrada ne iskoristi
+      * (redeemReward je briše), tako da card.html i scanner.html mogu
+      * uvek da prikažu tačno ono što je gost zaradio.
+      *
+      * VREME SKENIRANJA: ako je vlasnik uključio ograničenje (stampWindowEnabled),
+      * pečat se odbija van podešenog perioda (stampWindowStart—stampWindowEnd),
+      * vraćajući { ok:false, outsideWindow:true } pre bilo kakvog upisa u bazu.
+      */
+                  async function addStamp(customerId) {
+                         if (!isWithinStampWindow()) {
+                                  return {
+                                             ok: false,
+                                             outsideWindow: true,
+                                             stampWindowStart: cfg.stampWindowStart,
+                                             stampWindowEnd: cfg.stampWindowEnd,
+                                  };
+                         }
+                         if (wasRecentlyScanned(customerId)) {
+                                  return { ok: false, alreadyScanned: true };
+                         }
+
+       if (isFirebase) {
+                const ref = db.collection("businesses").doc(cfg.businessId)
+                  .collection("customers").doc(customerId);
+                const result = await db.runTransaction(async (tx) => {
+                           const doc = await tx.get(ref);
+                           if (!doc.exists) return null;
+                           const data = doc.data();
+                           const alreadyFull = data.stamps >= cfg.stampsRequired;
+                           const stamps = alreadyFull ? data.stamps : data.stamps + 1;
+                           const justCompleted = !alreadyFull && stamps >= cfg.stampsRequired;
+                           const update = { stamps, lastVisit: Date.now() };
+                           if (justCompleted) {
+                                      update.lockedRewardText = cfg.rewardText;
+                                      update.lockedRewardImageUrl = cfg.rewardImageUrl || null;
+                           }
+                           tx.update(ref, update);
+                           return { ...data, ...update, alreadyFull };
+                });
+                if (!result) return { ok: false, notFound: true };
+                return {
+                  ok: true,
+                  customer: result,
+                  rewardReady: result.alreadyFull,
+                  justCompleted: !result.alreadyFull && result.stamps >= cfg.stampsRequired,
+                };
+       } else {
+                const all = lsGetAll();
+                const c = all[customerId];
+                if (!c) return { ok: false, notFound: true };
+                const alreadyFull = c.stamps >= cfg.stampsRequired;
+                if (!alreadyFull) c.stamps += 1;
+                c.lastVisit = Date.now();
+                const justCompleted = !alreadyFull && c.stamps >= cfg.stampsRequired;
+                if (justCompleted) {
+                           c.lockedRewardText = cfg.rewardText;
+                           c.lockedRewardImageUrl = cfg.rewardImageUrl || null;
+                }
+                lsSaveAll(all);
+                return {
+                  ok: true,
+                  customer: c,
+                  rewardReady: alreadyFull,
+                  justCompleted,
+                };
+       }
+                  }
+
+                  /**
+      * Resetuje pečate na 0 i uvećava brojač iskorišćenih nagrada
+      * (poziva se kad gost iskoristi nagradu).
+      */
+                  async function redeemReward(customerId) {
+                         if (isFirebase) {
+                                  const ref = db.collection("businesses").doc(cfg.businessId)
+                                    .collection("customers").doc(customerId);
+                                  await db.runTransaction(async (tx) => {
+                                             const doc = await tx.get(ref);
+                                             if (!doc.exists) return;
+                                             const data = doc.data();
+                                             tx.update(ref, {
+                                                          stamps: Math.max(0, data.stamps - cfg.stampsRequired),
+                                                          rewardsRedeemed: (data.rewardsRedeemed || 0) + 1,
+                                                          // briše zaključanu nagradu — sledeći put kad kartica
+                                                          // bude popunjena, zaključaće se ono što je TADA aktuelno
+                                                          lockedRewardText: null,
+                                                          lockedRewardImageUrl: null,
+                                             });
+                                  });
+                         } else {
+                                  const all = lsGetAll();
+                                  const c = all[customerId];
+                                  if (!c) return;
+                                  c.stamps = Math.max(0, c.stamps - cfg.stampsRequired);
+                                  c.rewardsRedeemed = (c.rewardsRedeemed || 0) + 1;
+                                  c.lockedRewardText = null;
+                                  c.lockedRewardImageUrl = null;
+                                  lsSaveAll(all);
+                         }
+                  }
+
+                  /**
+      * SAMOSKENIRANJE / kod sa računa: osoblje na svom uređaju
+      * generiše jednokratni 6-cifreni kod koji važi ograničeno vreme
+      * (cfg.claimCodeTtlSeconds) i NIJE vezan ni za jednog gosta dok
+      * ga gost ne unese sam na svojoj kartici. Ovo je zamena za
+      * "skeniraj QR sa računa" bez potrebe za integracijom kase.
+      */
+                  function generateClaimCode() {
+                         const code = genClaimCode();
+                         const claims = lsGetClaims(); // claim kodovi žive lokalno na uređaju osoblja/kase
+       claims[code] = { createdAt: Date.now(), used: false };
+                         lsSaveClaims(claims);
+                         return { code, ttl: cfg.claimCodeTtlSeconds };
+                  }
+
+                  /**
+      * Gost unosi kod sa računa na svojoj kartici. Ako je validan i
+      * nije istekao/iskorišćen, dodaje mu pečat.
+      * NAPOMENA: u produkciji (Firebase) claim kodovi bi trebalo da
+      * žive u zajedničkoj bazi (ne localStorage) da bi radili kad
+      * kasa i gost nisu na istom uređaju — to je uključeno ispod
+      * kao firebase grana.
+      */
+                  async function redeemClaimCode(customerId, code) {
+                         if (isFirebase) {
+                                  const ref = db.collection("businesses").doc(cfg.businessId).collection("claimCodes").doc(code);
+                                  const doc = await ref.get();
+                                  if (!doc.exists) return { ok: false, reason: "not_found" };
+                                  const data = doc.data();
+                                  if (data.used) return { ok: false, reason: "used" };
+                                  if (Date.now() - data.createdAt > cfg.claimCodeTtlSeconds * 1000) return { ok: false, reason: "expired" };
+                                  await ref.update({ used: true, usedBy: customerId });
+                                  return await addStamp(customerId);
+                         } else {
+                                  const claims = lsGetClaims();
+                                  const c = claims[code];
+                                  if (!c) return { ok: false, reason: "not_found" };
+                                  if (c.used) return { ok: false, reason: "used" };
+                                  if (Date.now() - c.createdAt > cfg.claimCodeTtlSeconds * 1000) return { ok: false, reason: "expired" };
+                                  c.used = true;
+                                  lsSaveClaims(claims);
+                                  return await addStamp(customerId);
+                         }
+                  }
+
+                  // Ako je Firebase aktivan, claim kod mora i tamo da se upiše da bi ga gost
+                  // (na svom uređaju) mogao da pronađe.
+                  async function generateClaimCodeAsync() {
+                         const { code, ttl } = generateClaimCode();
+                         if (isFirebase) {
+                                  await db.collection("businesses").doc(cfg.businessId).collection("claimCodes").doc(code).set({
+                                             createdAt: Date.now(),
+                                             used: false,
+                                  });
+                         }
+                         return { code, ttl };
+                  }
+
+                  /**
+      * ---------- Podešavanja lokala (vlasnik menja SAM, bez koda) ----------
+      * config.js ostaje "seed"/podrazumevane vrednosti i tehnički identitet
+      * (businessId, firebase konekcija) — to i dalje menja developer. Sve što
+      * vlasnik treba da podešava (broj pečata, tekst nagrade, boje, PIN-ovi,
+      * SMS tekst, itd.) živi ODVOJENO, u ovom settings sloju, i preklapa
+      * (override) config.js vrednosti u realnom vremenu na svim ekranima.
+      */
+
+                  function watchSettings(callback) {
+                         if (isFirebase) {
+                                  return db.collection("businesses").doc(cfg.businessId)
+                                    .collection("settings").doc("main")
+                                    .onSnapshot((doc) => callback(doc.exists ? doc.data() : {}));
+                         } else {
+                                  const check = () => callback(lsGetSettings());
+                                  check();
+                                  const handler = () => check();
+                                  window.addEventListener("revera:update", handler);
+                                  window.addEventListener("storage", handler);
+                                  return () => {
+                                             window.removeEventListener("revera:update", handler);
+                                             window.removeEventListener("storage", handler);
+                                  };
+                         }
+                  }
+
+                  async function updateSettings(patch) {
+                         if (isFirebase) {
+                                  await db.collection("businesses").doc(cfg.businessId)
+                                    .collection("settings").doc("main").set(patch, { merge: true });
+                         } else {
+                                  const s = lsGetSettings();
+                                  Object.assign(s, patch);
+                                  if (patch.auth) s.auth = { ...(s.auth || {}), ...patch.auth };
+                                  lsSaveSettings(s);
+                         }
+                  }
+
+                  /**
+      * Upisuje settings PREKO podrazumevanih vrednosti, direktno u isti
+      * REVERA_CONFIG objekat (mutacija na mestu, ne zamena) — tako svaki deo
+      * koda koji već čita REVERA_CONFIG.xxx (u card.html, scanner.html,
+      * dashboard.html...) automatski vidi najnovije vrednosti, bez potrebe
+      * da se svuda menja izvor podataka.
+      */
+                  function applySettings(settings) {
+                         if (!settings) return;
+                         const { auth, ...rest } = settings;
+                         Object.assign(cfg, rest);
+                         if (auth) Object.assign(cfg.auth, auth);
+                  }
+
+                  async function findByPhone(last4) {
+                         if (isFirebase) {
+                                  const snap = await db.collection("businesses").doc(cfg.businessId)
+                                    .collection("customers").get();
+                                  const matches = [];
+                                  snap.forEach((d) => {
+                                             const c = d.data();
+                                             if ((c.phone || "").slice(-4) === last4) matches.push(c);
+                                  });
+                                  return matches;
+                         } else {
+                                  const all = Object.values(lsGetAll());
+                                  return all.filter((c) => (c.phone || "").slice(-4) === last4);
+                         }
+                  }
+
+                  return {
+                         cfg,
+                         isFirebase,
+                         createCustomer,
+                         getCustomer,
+                         watchCustomer,
+                         watchAllCustomers,
+                         addStamp,
+                         redeemReward,
+                         generateClaimCode: generateClaimCodeAsync,
+                         redeemClaimCode,
+                         findByPhone,
+                         watchSettings,
+                         updateSettings,
+                         applySettings,
+                  };
+})();
