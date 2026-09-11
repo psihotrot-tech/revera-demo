@@ -132,10 +132,18 @@
       ? "Nagrada je spremna!"
       : `Još ${remaining} do besplatne nagrade`;
     $("rewardBanner").style.display = c.stamps >= req ? "block" : "none";
-    $("rewardText").textContent = REVERA_CONFIG.rewardText;
+    // Prikazujemo nagradu ZAKLJUČANU u trenutku kad je kartica popunjena
+    // (c.lockedRewardText/lockedRewardImageUrl), ne trenutno podešavanje —
+    // tako gost uvek vidi tačno ono što mu je obećano kad je skupio
+    // poslednji pečat, čak i ako je vlasnik u međuvremenu promenio nagradu.
+    // Fallback na trenutno podešavanje je samo za goste čija je kartica
+    // bila puna PRE uvođenja ove izmene (nemaju još zaključanu vrednost).
+    const rewardText = c.lockedRewardText || REVERA_CONFIG.rewardText;
+    const rewardImageUrl = c.lockedRewardImageUrl || REVERA_CONFIG.rewardImageUrl;
+    $("rewardText").textContent = rewardText;
     const rewardImg = $("rewardImage");
-    if (REVERA_CONFIG.rewardImageUrl) {
-      rewardImg.src = REVERA_CONFIG.rewardImageUrl;
+    if (rewardImageUrl) {
+      rewardImg.src = rewardImageUrl;
       rewardImg.style.display = "block";
     } else {
       rewardImg.style.display = "none";
